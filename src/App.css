@@ -496,6 +496,14 @@ img { display: block; }
   .matchups-grid { grid-template-columns: 1fr; }
   .rivalry-narrative { display: none; }
 
+  /* Schedule Luck mobile */
+  .luck-header-row { display: none !important; }
+  .luck-row-item { grid-template-columns: 1fr !important; padding: 12px 14px !important; }
+  .luck-team-cell { display: none !important; }
+  .luck-bar-desktop { display: none !important; }
+  .luck-stat-cell { display: none !important; }
+  .luck-mobile-row { display: block !important; }
+
   /* Games tab mobile — swap desktop/mobile layouts */
   .game-row { flex-wrap: wrap !important; padding: 12px 14px !important; gap: 0 !important; }
   .game-row-week { display: none !important; }

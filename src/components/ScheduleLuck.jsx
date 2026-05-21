@@ -114,7 +114,8 @@ export default function ScheduleLuck({ luckData, rosterMap }) {
 
       {/* Table */}
       <div className="luck-list">
-        <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr 80px 100px 80px', gap: 12, padding: '6px 16px', marginBottom: 4 }}>
+        {/* Column headers — hidden on mobile */}
+        <div className="luck-header-row" style={{ display: 'grid', gridTemplateColumns: '200px 1fr 80px 100px 80px', gap: 12, padding: '6px 16px', marginBottom: 4 }}>
           {['Team', 'Luck Bar', 'Actual W', 'Expected W', 'Delta'].map((h) => (
             <span key={h} style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text3)', textAlign: h === 'Team' ? 'left' : 'right' }}>{h}</span>
           ))}
@@ -126,38 +127,61 @@ export default function ScheduleLuck({ luckData, rosterMap }) {
           const team = rosterMap[row.rosterId] || {};
 
           return (
-            <div
-              key={row.rosterId}
-              style={{
-                background: 'var(--bg2)',
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--radius-sm)',
-                padding: '12px 16px',
-                display: 'grid',
-                gridTemplateColumns: '200px 1fr 80px 100px 80px',
-                alignItems: 'center',
-                gap: 12,
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div key={row.rosterId} className="luck-row-item" style={{
+              background: 'var(--bg2)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-sm)',
+              padding: '12px 16px',
+              display: 'grid',
+              gridTemplateColumns: '200px 1fr 80px 100px 80px',
+              alignItems: 'center',
+              gap: 12,
+            }}>
+              {/* Desktop grid cells */}
+              <div className="luck-team-cell" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <Avatar avatar={team.avatar || row.avatar} name={row.displayName} />
                 <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>{row.displayName}</span>
               </div>
 
-              <div className="luck-bar-wrap">
+              <div className="luck-bar-wrap luck-bar-desktop">
                 <div className="luck-center-line" />
                 <div className={`luck-bar ${isLucky ? 'positive' : 'negative'}`} style={{ width: `${barPct}%` }} />
               </div>
 
-              <span style={{ fontFamily: 'var(--mono)', fontSize: '0.875rem', textAlign: 'right', color: 'var(--text)' }}>
+              <span className="luck-stat-cell" style={{ fontFamily: 'var(--mono)', fontSize: '0.875rem', textAlign: 'right', color: 'var(--text)' }}>
                 {row.actualWins}
               </span>
-              <span style={{ fontFamily: 'var(--mono)', fontSize: '0.875rem', textAlign: 'right', color: 'var(--text2)' }}>
+              <span className="luck-stat-cell" style={{ fontFamily: 'var(--mono)', fontSize: '0.875rem', textAlign: 'right', color: 'var(--text2)' }}>
                 {row.expectedWins.toFixed(1)}
               </span>
-              <span className={`luck-delta ${isLucky ? 'positive' : 'negative'}`} style={{ textAlign: 'right' }}>
+              <span className={`luck-delta ${isLucky ? 'positive' : 'negative'} luck-stat-cell`} style={{ textAlign: 'right' }}>
                 {isLucky ? '+' : ''}{row.luckDelta}
               </span>
+
+              {/* Mobile layout — single row: avatar + name + bar + delta */}
+              <div className="luck-mobile-row" style={{ display: 'none', gridColumn: '1 / -1' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                  <Avatar avatar={team.avatar || row.avatar} name={row.displayName} />
+                  <span style={{ fontWeight: 600, fontSize: '0.875rem', flex: 1 }}>{row.displayName}</span>
+                  <span className={`luck-delta ${isLucky ? 'positive' : 'negative'}`} style={{ fontSize: '1rem' }}>
+                    {isLucky ? '+' : ''}{row.luckDelta}
+                  </span>
+                </div>
+                {/* Bar */}
+                <div style={{ position: 'relative', height: 8, background: 'var(--bg3)', borderRadius: 99, overflow: 'visible', marginBottom: 4 }}>
+                  <div style={{ position: 'absolute', top: -4, left: '50%', width: 2, height: 16, background: 'var(--border)', transform: 'translateX(-50%)' }} />
+                  <div style={{
+                    position: 'absolute', height: 8, borderRadius: 99, top: 0,
+                    background: isLucky ? 'var(--green)' : 'var(--red)',
+                    width: `${barPct}%`,
+                    ...(isLucky ? { left: '50%' } : { right: '50%' }),
+                  }} />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text3)', marginTop: 4 }}>
+                  <span>Actual: <span style={{ fontFamily: 'var(--mono)', color: 'var(--text)' }}>{row.actualWins}W</span></span>
+                  <span>Expected: <span style={{ fontFamily: 'var(--mono)', color: 'var(--text2)' }}>{row.expectedWins.toFixed(1)}W</span></span>
+                </div>
+              </div>
             </div>
           );
         })}
