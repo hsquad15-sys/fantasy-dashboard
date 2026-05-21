@@ -496,6 +496,16 @@ img { display: block; }
   .matchups-grid { grid-template-columns: 1fr; }
   .rivalry-narrative { display: none; }
 
+  /* Transactions mobile */
+  .tx-header-row { display: none !important; }
+  .tx-row { grid-template-columns: 1fr !important; gap: 8px !important; padding: 12px 14px !important; }
+  .tx-col-date { display: flex; gap: 8px; align-items: center; }
+  .tx-col-date > div:first-child { font-size: 0.8rem !important; }
+  .tx-col-teams { flex-direction: row !important; flex-wrap: wrap; gap: 6px !important; }
+  .tx-col-receives { gap: 4px !important; }
+  .tx-col-sends { gap: 4px !important; }
+  .tx-col-type { justify-content: flex-start !important; }
+
   /* Schedule Luck mobile */
   .luck-header-row { display: none !important; }
   .luck-row-item { grid-template-columns: 1fr !important; padding: 12px 14px !important; }

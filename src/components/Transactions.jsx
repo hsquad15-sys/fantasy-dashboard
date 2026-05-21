@@ -136,7 +136,7 @@ export default function Transactions({ transactions, rosterMap }) {
     const sends    = isTrade ? null : dropEntries.map(([pid]) => pLabel(pid));
 
     return (
-      <div key={tx.transaction_id} style={{
+      <div key={tx.transaction_id} className="tx-row" style={{
         display: 'grid',
         gridTemplateColumns: '130px 180px 1fr 1fr 100px',
         gap: 16,
@@ -149,13 +149,13 @@ export default function Transactions({ transactions, rosterMap }) {
         onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
       >
         {/* DATE */}
-        <div>
+        <div className="tx-col-date">
           <div style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--text)' }}>{date}</div>
           <div style={{ fontSize: '0.75rem', color: 'var(--text3)', marginTop: 2 }}>{time}</div>
         </div>
 
         {/* TEAMS */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div className="tx-col-teams" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {rosterIds.map((rid, i) => (
             <div key={rid}>
               {i > 0 && rosterIds.length > 1 && (
@@ -172,7 +172,7 @@ export default function Transactions({ transactions, rosterMap }) {
         </div>
 
         {/* RECEIVES */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div className="tx-col-receives" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {isTrade
             ? allReceiveRids.map((rid) => {
                 const items = receivesByTeam[rid] || [];
@@ -202,7 +202,7 @@ export default function Transactions({ transactions, rosterMap }) {
         </div>
 
         {/* SENDS */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div className="tx-col-sends" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {isTrade
             ? allSendRids.map((rid) => {
                 const items = sendsByTeam[rid] || [];
@@ -232,7 +232,7 @@ export default function Transactions({ transactions, rosterMap }) {
         </div>
 
         {/* TYPE */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <div className="tx-col-type" style={{ display: 'flex', justifyContent: 'flex-end' }}>
           <span style={{
             fontSize: '0.75rem',
             fontWeight: 700,
@@ -311,7 +311,7 @@ export default function Transactions({ transactions, rosterMap }) {
       ) : (
         <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
           {/* Column headers */}
-          <div style={{
+          <div className="tx-header-row" style={{
             display: 'grid',
             gridTemplateColumns: '130px 180px 1fr 1fr 100px',
             gap: 16,
