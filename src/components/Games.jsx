@@ -123,8 +123,19 @@ export default function Games({ games, rosterMap }) {
             const winPts = t1Win ? game.team1Points : game.team2Points;
             const losPts = t1Win ? game.team2Points : game.team1Points;
 
+            const deltaBadge = (
+              <span style={{
+                fontFamily: 'var(--mono)', fontSize: '0.8rem', fontWeight: 700,
+                color: filter === 'nailbiters' ? 'var(--green)' : filter === 'blowouts' ? 'var(--red)' : filter === 'highscoring' ? 'var(--gold)' : 'var(--text3)',
+                background: filter === 'nailbiters' ? 'rgba(16,185,129,0.1)' : filter === 'blowouts' ? 'rgba(239,68,68,0.1)' : filter === 'highscoring' ? 'rgba(245,158,11,0.1)' : 'rgba(100,116,139,0.1)',
+                padding: '3px 10px', borderRadius: 99,
+              }}>
+                {filter === 'nailbiters' || filter === 'blowouts' ? `Δ ${game.margin.toFixed(1)}` : `${game.combined.toFixed(1)} pts`}
+              </span>
+            );
+
             return (
-              <div key={i} style={{
+              <div key={i} className="game-row" style={{
                 background: 'var(--bg2)',
                 border: '1px solid var(--border)',
                 borderRadius: 'var(--radius)',
@@ -133,68 +144,50 @@ export default function Games({ games, rosterMap }) {
                 alignItems: 'center',
                 gap: 16,
               }}>
-                <span style={{
-                  fontFamily: 'var(--mono)',
-                  fontSize: '0.72rem',
-                  color: 'var(--text3)',
-                  width: 70,
-                  flexShrink: 0,
+                {/* Desktop layout */}
+                <span className="game-row-week" style={{
+                  fontFamily: 'var(--mono)', fontSize: '0.72rem',
+                  color: 'var(--text3)', width: 70, flexShrink: 0,
                 }}>
                   {game.season ? `${game.season} ` : ''}Wk {game.week}
                 </span>
 
-                <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div className="game-row-middle" style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 12 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
                     <Avatar avatar={avatar(winner)} name={name(winner)} />
-                    <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text)' }}>
-                      {name(winner)}
-                    </span>
+                    <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text)' }}>{name(winner)}</span>
                   </div>
-
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-                    <span style={{ fontFamily: 'var(--mono)', fontWeight: 700, fontSize: '1.05rem', color: 'var(--green)' }}>
-                      {winPts.toFixed(2)}
-                    </span>
+                    <span style={{ fontFamily: 'var(--mono)', fontWeight: 700, fontSize: '1.05rem', color: 'var(--green)' }}>{winPts.toFixed(2)}</span>
                     <span style={{ color: 'var(--text3)', fontSize: '0.8rem' }}>–</span>
-                    <span style={{ fontFamily: 'var(--mono)', fontWeight: 600, fontSize: '1.05rem', color: 'var(--text3)' }}>
-                      {losPts.toFixed(2)}
-                    </span>
+                    <span style={{ fontFamily: 'var(--mono)', fontWeight: 600, fontSize: '1.05rem', color: 'var(--text3)' }}>{losPts.toFixed(2)}</span>
                   </div>
-
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, justifyContent: 'flex-end' }}>
-                    <span style={{ fontWeight: 500, fontSize: '0.9rem', color: 'var(--text2)', textAlign: 'right' }}>
-                      {name(loser)}
-                    </span>
+                    <span style={{ fontWeight: 500, fontSize: '0.9rem', color: 'var(--text2)', textAlign: 'right' }}>{name(loser)}</span>
                     <Avatar avatar={avatar(loser)} name={name(loser)} />
                   </div>
                 </div>
 
-                <div style={{ flexShrink: 0, textAlign: 'right', minWidth: 80 }}>
-                  {filter === 'nailbiters' || filter === 'blowouts' ? (
-                    <span style={{
-                      fontFamily: 'var(--mono)',
-                      fontSize: '0.8rem',
-                      fontWeight: 700,
-                      color: filter === 'nailbiters' ? 'var(--green)' : 'var(--red)',
-                      background: filter === 'nailbiters' ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)',
-                      padding: '3px 10px',
-                      borderRadius: 99,
-                    }}>
-                      Δ {game.margin.toFixed(1)}
+                {/* Mobile layout — hidden on desktop via CSS */}
+                <div className="game-row-mobile" style={{ flex: 1, display: 'none' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: '0.72rem', color: 'var(--text3)' }}>
+                      {game.season ? `${game.season} ` : ''}Wk {game.week}
                     </span>
-                  ) : (
-                    <span style={{
-                      fontFamily: 'var(--mono)',
-                      fontSize: '0.8rem',
-                      fontWeight: 700,
-                      color: filter === 'highscoring' ? 'var(--gold)' : 'var(--text3)',
-                      background: filter === 'highscoring' ? 'rgba(245,158,11,0.1)' : 'rgba(100,116,139,0.1)',
-                      padding: '3px 10px',
-                      borderRadius: 99,
-                    }}>
-                      {game.combined.toFixed(1)} pts
-                    </span>
-                  )}
+                    {deltaBadge}
+                  </div>
+                  {[[winner, winPts, 'var(--green)', true], [loser, losPts, 'var(--text3)', false]].map(([teamId, pts, scoreColor, isWin]) => (
+                    <div key={teamId} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}>
+                      <Avatar avatar={avatar(teamId)} name={name(teamId)} size={24} />
+                      <span style={{ flex: 1, fontWeight: isWin ? 700 : 400, fontSize: '0.875rem', color: isWin ? 'var(--text)' : 'var(--text2)' }}>{name(teamId)}</span>
+                      <span style={{ fontFamily: 'var(--mono)', fontWeight: 700, fontSize: '0.95rem', color: scoreColor }}>{pts.toFixed(2)}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Delta badge — desktop only */}
+                <div className="game-delta-desktop" style={{ flexShrink: 0, textAlign: 'right', minWidth: 80 }}>
+                  {deltaBadge}
                 </div>
               </div>
             );

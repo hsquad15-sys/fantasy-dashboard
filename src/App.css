@@ -495,6 +495,18 @@ img { display: block; }
   .superlatives-grid { grid-template-columns: 1fr 1fr; }
   .matchups-grid { grid-template-columns: 1fr; }
   .rivalry-narrative { display: none; }
+
+  /* Games tab mobile — swap desktop/mobile layouts */
+  .game-row { flex-wrap: wrap !important; padding: 12px 14px !important; gap: 0 !important; }
+  .game-row-week { display: none !important; }
+  .game-row-middle { display: none !important; }
+  .game-delta-desktop { display: none !important; }
+  .game-row-mobile { display: block !important; }
+}
+@media (max-width: 480px) {
+  .league-name { font-size: 1rem; }
+  .superlatives-grid { grid-template-columns: 1fr; }
+  .header-title .league-sub { display: none; }
 }
 @media (max-width: 480px) {
   .league-name { font-size: 1rem; }
