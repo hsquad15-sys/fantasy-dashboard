@@ -1,12 +1,19 @@
 import { useMemo, useState, useEffect } from 'react';
 import { fetchPlayers, playerLabel, avatarUrl } from '../lib/sleeper.jsx';
+import {
+  fetchFantasyCalcValues,
+  buildValueMap,
+  lookupPickValue,
+  lookupPlayerValue,
+  gradeTradeTeam,
+} from '../lib/fantasycalc.jsx';
 
 const PAGE_SIZE = 15;
 
 const TYPE_LABELS = { trade: 'Trade', waiver: 'Waiver', free_agent: 'Free Agent' };
 const TYPE_COLORS = {
-  trade:      { bg: 'rgba(99,102,241,0.15)', color: '#818cf8' },
-  waiver:     { bg: 'rgba(59,130,246,0.15)', color: '#60a5fa' },
+  trade:      { bg: 'rgba(99,102,241,0.15)',  color: '#818cf8' },
+  waiver:     { bg: 'rgba(59,130,246,0.15)',  color: '#60a5fa' },
   free_agent: { bg: 'rgba(16,185,129,0.15)', color: '#34d399' },
 };
 
@@ -29,26 +36,137 @@ function formatDateTime(ts) {
   };
 }
 
+function GradeBadge({ grade, color, size = 'sm' }) {
+  if (!grade) return null;
+  const fontSize = size === 'lg' ? '1.1rem' : '0.75rem';
+  const padding  = size === 'lg' ? '4px 12px' : '2px 7px';
+  return (
+    <span style={{
+      fontFamily: 'var(--mono)',
+      fontWeight: 800,
+      fontSize,
+      padding,
+      borderRadius: 99,
+      background: `${color}22`,
+      color,
+      border: `1px solid ${color}55`,
+      flexShrink: 0,
+    }}>
+      {grade}
+    </span>
+  );
+}
+
+function TradeStatCard({ emoji, label, name, avatar, net, trades }) {
+  const isPositive = net >= 0;
+  return (
+    <div style={{
+      background: 'var(--bg2)',
+      border: `1px solid ${isPositive ? 'rgba(74,222,128,0.2)' : 'rgba(248,113,113,0.2)'}`,
+      borderRadius: 'var(--radius)',
+      padding: '16px 20px',
+      flex: 1,
+      minWidth: 200,
+    }}>
+      <div style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text3)', marginBottom: 10 }}>
+        {emoji} {label}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+        <Avatar avatar={avatar} name={name} size={32} />
+        <span style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text)' }}>{name}</span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{
+          fontFamily: 'var(--mono)',
+          fontWeight: 800,
+          fontSize: '1.1rem',
+          color: isPositive ? '#4ade80' : '#f87171',
+        }}>
+          {isPositive ? '+' : ''}{Math.round(net).toLocaleString()}
+        </span>
+        <span style={{ fontSize: '0.75rem', color: 'var(--text3)' }}>value · {trades} trade{trades !== 1 ? 's' : ''}</span>
+      </div>
+    </div>
+  );
+}
+
 export default function Transactions({ transactions, rosterMap }) {
-  const [filter, setFilter]   = useState('all');
-  const [search, setSearch]   = useState('');
+  const [filter, setFilter]         = useState('all');
+  const [search, setSearch]         = useState('');
   const [teamFilter, setTeamFilter] = useState('all');
   const [seasonFilter, setSeasonFilter] = useState('all');
-  const [page, setPage]       = useState(1);
-  const [players, setPlayers] = useState(null);
+  const [page, setPage]             = useState(1);
+  const [players, setPlayers]       = useState(null);
+  const [fcValues, setFcValues]     = useState(null);
   const [playersLoading, setPlayersLoading] = useState(true);
 
   useEffect(() => {
     fetchPlayers().then(setPlayers).catch(() => setPlayers({})).finally(() => setPlayersLoading(false));
+    fetchFantasyCalcValues().then(setFcValues).catch(() => {});
   }, []);
 
-  // Reset page when filters change
   useEffect(() => { setPage(1); }, [filter, search, teamFilter, seasonFilter]);
+
+  const valueMap = useMemo(() => buildValueMap(fcValues), [fcValues]);
 
   const sorted = useMemo(() =>
     [...transactions].filter((tx) => tx.status === 'complete').sort((a, b) => (b.created || 0) - (a.created || 0)),
     [transactions]
   );
+
+  // Compute per-team received/sent value for a trade
+  function computeTradeValues(tx) {
+    if (tx.type !== 'trade') return null;
+    const received = {};
+    Object.entries(tx.adds || {}).forEach(([pid, toRid]) => {
+      const val = lookupPlayerValue(valueMap, players, pid);
+      const key = String(toRid);
+      received[key] = (received[key] || 0) + val;
+    });
+    (tx.draft_picks || []).forEach((p) => {
+      const val = lookupPickValue(valueMap, p.round, p.season);
+      // owner_id = who gets the pick after the trade
+      const toKey = p.owner_id != null ? String(p.owner_id) : null;
+      if (toKey) received[toKey] = (received[toKey] || 0) + val;
+    });
+    const total = Object.values(received).reduce((a, b) => a + b, 0);
+    const rids = (tx.roster_ids || []).map(String);
+    const result = {};
+    rids.forEach((rid) => {
+      const teamReceived = received[rid] || 0;
+      const teamSent = total - teamReceived;
+      result[rid] = { received: teamReceived, sent: teamSent, grade: gradeTradeTeam(teamReceived, teamSent) };
+    });
+    return result;
+  }
+
+  // Trade Shark / Got Cooked aggregates
+  const tradeStats = useMemo(() => {
+    if (!fcValues || !players) return null;
+    const nets = {};
+    const counts = {};
+    sorted.filter((tx) => tx.type === 'trade').forEach((tx) => {
+      const vals = computeTradeValues(tx);
+      if (!vals) return;
+      (tx.roster_ids || []).forEach((rid) => {
+        const key = String(rid);
+        const { received, sent } = vals[key] || { received: 0, sent: 0 };
+        nets[key] = (nets[key] || 0) + (received - sent);
+        counts[key] = (counts[key] || 0) + 1;
+      });
+    });
+    const entries = Object.entries(nets)
+      .map(([rid, net]) => ({
+        rid, net,
+        trades: counts[rid] || 0,
+        name:   rosterMap[Number(rid)]?.displayName || rosterMap[rid]?.displayName || `Team ${rid}`,
+        avatar: rosterMap[Number(rid)]?.avatar      || rosterMap[rid]?.avatar,
+      }))
+      .filter((e) => e.trades > 0);
+    if (entries.length < 2) return null;
+    entries.sort((a, b) => b.net - a.net);
+    return { shark: entries[0], cooked: entries[entries.length - 1] };
+  }, [sorted, fcValues, players, valueMap, rosterMap]);
 
   const teams = useMemo(() => {
     const ids = new Set(sorted.flatMap((tx) => tx.roster_ids || []));
@@ -63,9 +181,9 @@ export default function Transactions({ transactions, rosterMap }) {
   const pLabel = (id) => playerLabel(players, id);
 
   const allItems = (tx) => {
-    const adds   = Object.keys(tx.adds || {});
-    const drops  = Object.keys(tx.drops || {});
-    const picks  = (tx.draft_picks || []).map((p) => `${p.season} Rd ${p.round}`);
+    const adds  = Object.keys(tx.adds || {});
+    const drops = Object.keys(tx.drops || {});
+    const picks = (tx.draft_picks || []).map((p) => `${p.season} Rd ${p.round}`);
     return [...adds.map(pLabel), ...drops.map(pLabel), ...picks].join(' ').toLowerCase();
   };
 
@@ -98,14 +216,16 @@ export default function Transactions({ transactions, rosterMap }) {
     const type   = tx.type || 'unknown';
     const colors = TYPE_COLORS[type] || { bg: 'var(--bg3)', color: 'var(--text2)' };
     const rosterIds = tx.roster_ids || [];
+    const isTrade = type === 'trade';
+    const str = (v) => String(v);
 
-    const addEntries = Object.entries(tx.adds || {});
+    const tradeVals = isTrade && fcValues && players ? computeTradeValues(tx) : null;
+
+    const addEntries  = Object.entries(tx.adds  || {});
     const dropEntries = Object.entries(tx.drops || {});
     const picks = tx.draft_picks || [];
 
-    const isTrade = type === 'trade';
-    const str = (v) => String(v);
-    const allRosterIds = rosterIds.map(str);
+    const allRosterIds = [...new Set([...rosterIds.map(str)])];
 
     const receivesByTeam = {};
     const sendsByTeam = {};
@@ -122,17 +242,17 @@ export default function Transactions({ transactions, rosterMap }) {
       sendsByTeam[key].push({ label: pLabel(pid), isPick: false });
     });
     picks.forEach((p) => {
-      const label = `${p.season} Round ${p.round} pick`;
-      const toKey   = p.roster_id != null ? str(p.roster_id) : null;
-      const fromKey = p.previous_roster_id != null ? str(p.previous_roster_id) : null;
+      const label  = `${p.season} Round ${p.round} pick`;
+      const toKey   = p.owner_id != null          ? str(p.owner_id)          : null;
+      const fromKey = p.previous_owner_id != null ? str(p.previous_owner_id) : null;
       if (toKey)   { if (!receivesByTeam[toKey]) receivesByTeam[toKey] = []; receivesByTeam[toKey].push({ label, isPick: true }); }
       if (fromKey) { if (!sendsByTeam[fromKey])  sendsByTeam[fromKey]  = []; sendsByTeam[fromKey].push({ label, isPick: true }); }
     });
 
-    const allReceiveRids = [...new Set([...allRosterIds, ...Object.keys(receivesByTeam).filter(k => receivesByTeam[k].length)])];
-    const allSendRids    = [...new Set([...allRosterIds, ...Object.keys(sendsByTeam).filter(k => sendsByTeam[k].length)])];
+    const allReceiveRids = [...new Set([...allRosterIds, ...Object.keys(receivesByTeam).filter((k) => receivesByTeam[k].length)])];
+    const allSendRids    = [...new Set([...allRosterIds, ...Object.keys(sendsByTeam).filter((k) => sendsByTeam[k].length)])];
 
-    const receives = isTrade ? null : [...addEntries.map(([pid]) => pLabel(pid)), ...picks.map(p => `${p.season} Round ${p.round} pick`)];
+    const receives = isTrade ? null : [...addEntries.map(([pid]) => pLabel(pid)), ...picks.map((p) => `${p.season} Round ${p.round} pick`)];
     const sends    = isTrade ? null : dropEntries.map(([pid]) => pLabel(pid));
 
     return (
@@ -155,20 +275,25 @@ export default function Transactions({ transactions, rosterMap }) {
         </div>
 
         {/* TEAMS */}
-        <div className="tx-col-teams" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {rosterIds.map((rid, i) => (
-            <div key={rid}>
-              {i > 0 && rosterIds.length > 1 && (
-                <div style={{ color: 'var(--text3)', fontSize: '0.75rem', marginBottom: 4 }}>⇌</div>
-              )}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                <Avatar avatar={rosterMap[rid]?.avatar} name={rosterMap[rid]?.displayName} />
-                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text)' }}>
-                  {rosterMap[rid]?.displayName || `Team ${rid}`}
-                </span>
+        <div className="tx-col-teams" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {rosterIds.map((rid, i) => {
+            const ridStr = str(rid);
+            const tval = tradeVals?.[ridStr];
+            return (
+              <div key={rid}>
+                {i > 0 && rosterIds.length > 1 && (
+                  <div style={{ color: 'var(--text3)', fontSize: '0.75rem', marginBottom: 4 }}>⇌</div>
+                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
+                  <Avatar avatar={rosterMap[rid]?.avatar} name={rosterMap[rid]?.displayName} />
+                  <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text)' }}>
+                    {rosterMap[rid]?.displayName || `Team ${rid}`}
+                  </span>
+                  {tval?.grade && <GradeBadge grade={tval.grade.grade} color={tval.grade.color} />}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* RECEIVES */}
@@ -234,13 +359,8 @@ export default function Transactions({ transactions, rosterMap }) {
         {/* TYPE */}
         <div className="tx-col-type" style={{ display: 'flex', justifyContent: 'flex-end' }}>
           <span style={{
-            fontSize: '0.75rem',
-            fontWeight: 700,
-            padding: '4px 12px',
-            borderRadius: 99,
-            background: colors.bg,
-            color: colors.color,
-            whiteSpace: 'nowrap',
+            fontSize: '0.75rem', fontWeight: 700, padding: '4px 12px',
+            borderRadius: 99, background: colors.bg, color: colors.color, whiteSpace: 'nowrap',
           }}>
             {TYPE_LABELS[type] || type}
           </span>
@@ -254,6 +374,28 @@ export default function Transactions({ transactions, rosterMap }) {
       <div className="section-header">
         <h2 className="section-title">Transactions</h2>
       </div>
+
+      {/* Trade Shark / Got Cooked cards */}
+      {tradeStats && (
+        <div style={{ display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
+          <TradeStatCard
+            emoji="🦈"
+            label="Trade Shark"
+            name={tradeStats.shark.name}
+            avatar={tradeStats.shark.avatar}
+            net={tradeStats.shark.net}
+            trades={tradeStats.shark.trades}
+          />
+          <TradeStatCard
+            emoji="🍳"
+            label="Got Cooked"
+            name={tradeStats.cooked.name}
+            avatar={tradeStats.cooked.avatar}
+            net={tradeStats.cooked.net}
+            trades={tradeStats.cooked.trades}
+          />
+        </div>
+      )}
 
       {/* Filter pills */}
       <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
@@ -281,7 +423,6 @@ export default function Transactions({ transactions, rosterMap }) {
             }}
           />
         </div>
-
         <select
           value={teamFilter}
           onChange={(e) => setTeamFilter(e.target.value)}
@@ -290,7 +431,6 @@ export default function Transactions({ transactions, rosterMap }) {
           <option value="all">All Teams</option>
           {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
         </select>
-
         <select
           value={seasonFilter}
           onChange={(e) => setSeasonFilter(e.target.value)}
@@ -299,7 +439,6 @@ export default function Transactions({ transactions, rosterMap }) {
           <option value="all">All Seasons</option>
           {seasons.map((y) => <option key={y} value={y}>{y}</option>)}
         </select>
-
         <span style={{ marginLeft: 'auto', fontSize: '0.8rem', color: 'var(--text3)' }}>
           {filtered.length} results
         </span>
@@ -310,66 +449,43 @@ export default function Transactions({ transactions, rosterMap }) {
         <div className="loading-screen"><div className="spinner" /><p>Loading player names…</p></div>
       ) : (
         <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
-          {/* Column headers */}
           <div className="tx-header-row" style={{
-            display: 'grid',
-            gridTemplateColumns: '130px 180px 1fr 1fr 100px',
-            gap: 16,
-            padding: '10px 20px',
-            borderBottom: '1px solid var(--border)',
+            display: 'grid', gridTemplateColumns: '130px 180px 1fr 1fr 100px',
+            gap: 16, padding: '10px 20px', borderBottom: '1px solid var(--border)',
           }}>
-            {[['DATE', 'left'], ['TEAMS', 'left'], ['RECEIVES', 'left'], ['SENDS', 'left'], ['TYPE', 'right']].map(([h, align]) => (
+            {[['DATE', 'left'], ['TEAMS / GRADE', 'left'], ['RECEIVES', 'left'], ['SENDS', 'left'], ['TYPE', 'right']].map(([h, align]) => (
               <span key={h} style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: h === 'RECEIVES' ? 'var(--green)' : h === 'SENDS' ? 'var(--red)' : 'var(--text3)', textAlign: align }}>
                 {h}
               </span>
             ))}
           </div>
-
-          {paginated.length === 0 ? (
-            <div style={{ padding: 40, textAlign: 'center', color: 'var(--text3)' }}>No transactions match your filters.</div>
-          ) : (
-            paginated.map(renderRow)
-          )}
+          {paginated.length === 0
+            ? <div style={{ padding: 40, textAlign: 'center', color: 'var(--text3)' }}>No transactions match your filters.</div>
+            : paginated.map(renderRow)
+          }
         </div>
       )}
 
       {/* Pagination */}
       {pages > 1 && (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 20 }}>
-          <button
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page === 1}
-            style={{ padding: '6px 12px', borderRadius: 'var(--radius-pill)', background: 'var(--bg2)', border: '1px solid var(--border)', color: page === 1 ? 'var(--text3)' : 'var(--text)', cursor: page === 1 ? 'default' : 'pointer' }}
-          >
-            ‹
-          </button>
+          <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
+            style={{ padding: '6px 12px', borderRadius: 'var(--radius-pill)', background: 'var(--bg2)', border: '1px solid var(--border)', color: page === 1 ? 'var(--text3)' : 'var(--text)', cursor: page === 1 ? 'default' : 'pointer' }}>‹</button>
           {Array.from({ length: pages }, (_, i) => i + 1)
             .filter((p) => p === 1 || p === pages || Math.abs(p - page) <= 1)
-            .reduce((acc, p, i, arr) => {
-              if (i > 0 && p - arr[i - 1] > 1) acc.push('...');
-              acc.push(p);
-              return acc;
-            }, [])
+            .reduce((acc, p, i, arr) => { if (i > 0 && p - arr[i - 1] > 1) acc.push('...'); acc.push(p); return acc; }, [])
             .map((p, i) =>
               p === '...' ? (
-                <span key={`ellipsis-${i}`} style={{ color: 'var(--text3)', padding: '0 4px' }}>…</span>
+                <span key={`e-${i}`} style={{ color: 'var(--text3)', padding: '0 4px' }}>…</span>
               ) : (
-                <button
-                  key={p}
-                  onClick={() => setPage(p)}
-                  style={{ width: 36, height: 36, borderRadius: 'var(--radius-pill)', background: page === p ? 'var(--purple)' : 'var(--bg2)', border: '1px solid var(--border)', color: page === p ? '#fff' : 'var(--text2)', fontWeight: page === p ? 700 : 400, cursor: 'pointer' }}
-                >
+                <button key={p} onClick={() => setPage(p)}
+                  style={{ width: 36, height: 36, borderRadius: 'var(--radius-pill)', background: page === p ? 'var(--purple)' : 'var(--bg2)', border: '1px solid var(--border)', color: page === p ? '#fff' : 'var(--text2)', fontWeight: page === p ? 700 : 400, cursor: 'pointer' }}>
                   {p}
                 </button>
               )
             )}
-          <button
-            onClick={() => setPage((p) => Math.min(pages, p + 1))}
-            disabled={page === pages}
-            style={{ padding: '6px 12px', borderRadius: 'var(--radius-pill)', background: 'var(--bg2)', border: '1px solid var(--border)', color: page === pages ? 'var(--text3)' : 'var(--text)', cursor: page === pages ? 'default' : 'pointer' }}
-          >
-            ›
-          </button>
+          <button onClick={() => setPage((p) => Math.min(pages, p + 1))} disabled={page === pages}
+            style={{ padding: '6px 12px', borderRadius: 'var(--radius-pill)', background: 'var(--bg2)', border: '1px solid var(--border)', color: page === pages ? 'var(--text3)' : 'var(--text)', cursor: page === pages ? 'default' : 'pointer' }}>›</button>
         </div>
       )}
     </div>
