@@ -101,27 +101,42 @@ function TradeStatCard({ emoji, label, name, avatar, net, trades, tradeList = []
             {expanded ? 'Hide ▴' : `Show trades ▾`}
           </button>
           {expanded && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 420, overflowY: 'auto' }}>
               {tradeList.map((t, i) => (
                 <div key={i} style={{
                   background: 'var(--bg3)', borderRadius: 6, padding: '8px 10px',
-                  display: 'flex', flexDirection: 'column', gap: 4,
+                  display: 'flex', flexDirection: 'column', gap: 3,
+                  borderLeft: `2px solid ${t.net >= 0 ? 'rgba(74,222,128,0.45)' : 'rgba(248,113,113,0.45)'}`,
                 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text3)' }}>{t.date}</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {/* Date · vs · grade · net */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, flexWrap: 'wrap' }}>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text3)', lineHeight: 1.4 }}>
+                      <span>{t.date}</span>
+                      <span style={{ margin: '0 4px', opacity: 0.5 }}>·</span>
+                      <span>vs {t.opponents.join(', ')}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
                       {t.grade && <GradeBadge grade={t.grade.grade} color={t.grade.color} />}
                       <span style={{
-                        fontFamily: 'var(--mono)', fontWeight: 700, fontSize: '0.8rem',
+                        fontFamily: 'var(--mono)', fontWeight: 700, fontSize: '0.78rem',
                         color: t.net >= 0 ? '#4ade80' : '#f87171',
                       }}>
                         {t.net >= 0 ? '+' : ''}{Math.round(t.net).toLocaleString()}
                       </span>
                     </div>
                   </div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text2)' }}>
-                    vs {t.opponents.join(', ')}
-                  </div>
+                  {/* Got */}
+                  {t.got?.length > 0 && (
+                    <div style={{ fontSize: '0.72rem', lineHeight: 1.5, color: '#86efac', wordBreak: 'break-word' }}>
+                      <span style={{ fontWeight: 700 }}>+</span> {t.got.join(', ')}
+                    </div>
+                  )}
+                  {/* Sent */}
+                  {t.sent?.length > 0 && (
+                    <div style={{ fontSize: '0.72rem', lineHeight: 1.5, color: '#fca5a5', wordBreak: 'break-word' }}>
+                      <span style={{ fontWeight: 700 }}>−</span> {t.sent.join(', ')}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -198,12 +213,28 @@ export default function Transactions({ transactions, rosterMap }) {
         const vals = computeTradeValues(tx);
         if (!vals) return;
         const { date } = formatDateTime(tx.created);
+        const str = (v) => String(v);
         (tx.roster_ids || []).forEach((rid) => {
           const key = String(rid);
           const { received, sent } = vals[key] || { received: 0, sent: 0 };
           const tradeNet = received - sent;
           nets[key] = (nets[key] || 0) + tradeNet;
           counts[key] = (counts[key] || 0) + 1;
+
+          const gotItems = [];
+          const sentItems = [];
+          Object.entries(tx.adds || {}).forEach(([pid, toRid]) => {
+            if (str(toRid) === key) gotItems.push(playerLabel(players, pid));
+          });
+          Object.entries(tx.drops || {}).forEach(([pid, fromRid]) => {
+            if (str(fromRid) === key) sentItems.push(playerLabel(players, pid));
+          });
+          (tx.draft_picks || []).forEach((p) => {
+            const label = `${p.season} Rd ${p.round}`;
+            if (p.owner_id != null && str(p.owner_id) === key) gotItems.push(label);
+            if (p.previous_owner_id != null && str(p.previous_owner_id) === key) sentItems.push(label);
+          });
+
           if (!teamTrades[key]) teamTrades[key] = [];
           teamTrades[key].push({
             date,
@@ -212,6 +243,8 @@ export default function Transactions({ transactions, rosterMap }) {
               .map((r) => rosterMap[r]?.displayName || rosterMap[Number(r)]?.displayName || `Team ${r}`),
             net: tradeNet,
             grade: vals[key]?.grade,
+            got: gotItems,
+            sent: sentItems,
           });
         });
       });
