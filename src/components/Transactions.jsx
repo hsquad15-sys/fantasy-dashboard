@@ -140,21 +140,27 @@ export default function Transactions({ transactions, rosterMap }) {
     return result;
   }
 
-  // Trade Shark / Got Cooked aggregates
+  // Trade Shark / Got Cooked aggregates — respects the year filter
   const tradeStats = useMemo(() => {
     if (!fcValues || !players) return null;
     const nets = {};
     const counts = {};
-    sorted.filter((tx) => tx.type === 'trade').forEach((tx) => {
-      const vals = computeTradeValues(tx);
-      if (!vals) return;
-      (tx.roster_ids || []).forEach((rid) => {
-        const key = String(rid);
-        const { received, sent } = vals[key] || { received: 0, sent: 0 };
-        nets[key] = (nets[key] || 0) + (received - sent);
-        counts[key] = (counts[key] || 0) + 1;
+    sorted
+      .filter((tx) => {
+        if (tx.type !== 'trade') return false;
+        if (seasonFilter !== 'all' && tx.created && new Date(tx.created).getFullYear() !== Number(seasonFilter)) return false;
+        return true;
+      })
+      .forEach((tx) => {
+        const vals = computeTradeValues(tx);
+        if (!vals) return;
+        (tx.roster_ids || []).forEach((rid) => {
+          const key = String(rid);
+          const { received, sent } = vals[key] || { received: 0, sent: 0 };
+          nets[key] = (nets[key] || 0) + (received - sent);
+          counts[key] = (counts[key] || 0) + 1;
+        });
       });
-    });
     const entries = Object.entries(nets)
       .map(([rid, net]) => ({
         rid, net,
@@ -166,7 +172,7 @@ export default function Transactions({ transactions, rosterMap }) {
     if (entries.length < 2) return null;
     entries.sort((a, b) => b.net - a.net);
     return { shark: entries[0], cooked: entries[entries.length - 1] };
-  }, [sorted, fcValues, players, valueMap, rosterMap]);
+  }, [sorted, fcValues, players, valueMap, rosterMap, seasonFilter]);
 
   const teams = useMemo(() => {
     const ids = new Set(sorted.flatMap((tx) => tx.roster_ids || []));
@@ -377,7 +383,11 @@ export default function Transactions({ transactions, rosterMap }) {
 
       {/* Trade Shark / Got Cooked cards */}
       {tradeStats && (
-        <div style={{ display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text3)', marginBottom: 10 }}>
+            Trade Grades · {seasonFilter === 'all' ? 'All Time' : seasonFilter}
+          </div>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
           <TradeStatCard
             emoji="🦈"
             label="Trade Shark"
@@ -394,6 +404,7 @@ export default function Transactions({ transactions, rosterMap }) {
             net={tradeStats.cooked.net}
             trades={tradeStats.cooked.trades}
           />
+          </div>
         </div>
       )}
 

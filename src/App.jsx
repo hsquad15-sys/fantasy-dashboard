@@ -188,7 +188,15 @@ export default function App() {
             )}
             {activeTab === 'transactions' && (
               <Transactions
-                transactions={data.currentSeasonData?.transactions || []}
+                transactions={
+                  data.mode === 'all'
+                    ? [
+                        ...(data.seasons?.['2024']?.transactions || []),
+                        ...(data.seasons?.['2025']?.transactions || []),
+                        ...(data.seasons?.['2026']?.transactions || []),
+                      ]
+                    : data.currentSeasonData?.transactions || []
+                }
                 rosterMap={data.currentSeasonData?.rosterMap || {}}
               />
             )}
