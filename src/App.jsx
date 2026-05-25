@@ -68,12 +68,12 @@ export default function App() {
               12 Teams · PPR · SuperFlex
               <span className="league-sub-dot">·</span>
               {totalGames > 0 && <>{totalGames} matchups<span className="league-sub-dot">·</span></>}
-              2024–2025
+              2024–2026
             </p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div className="season-switcher">
-              {['2024', '2025', 'all'].map((s) => (
+              {['2024', '2025', '2026', 'all'].map((s) => (
                 <button
                   key={s}
                   className={`season-btn${season === s ? ' active' : ''}`}
@@ -141,7 +141,7 @@ export default function App() {
                 scheduleLuck={data.scheduleLuck || []}
                 seasonsData={
                   data.mode === 'all'
-                    ? { '2024': data.seasons?.['2024'], '2025': data.seasons?.['2025'] }
+                    ? { '2024': data.seasons?.['2024'], '2025': data.seasons?.['2025'], '2026': data.seasons?.['2026'] }
                     : { [season]: data.currentSeasonData }
                 }
               />

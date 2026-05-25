@@ -88,23 +88,24 @@ export function useLeagueData(selectedSeason) {
     setError(null);
     try {
       if (selectedSeason === 'all') {
-        const [data2024, data2025] = await Promise.all([
+        const [data2024, data2025, data2026] = await Promise.all([
           loadSeason(SEASONS['2024'], '2024'),
           loadSeason(SEASONS['2025'], '2025'),
+          loadSeason(SEASONS['2026'], '2026'),
         ]);
 
         // Build taggedId -> ownerId map so cross-season analytics use stable owner identity
         const taggedToOwner = {};
         Object.values(data2024.rosterMap).forEach((t) => { taggedToOwner[`2024_${t.rosterId}`] = t.ownerId; });
         Object.values(data2025.rosterMap).forEach((t) => { taggedToOwner[`2025_${t.rosterId}`] = t.ownerId; });
+        Object.values(data2026.rosterMap).forEach((t) => { taggedToOwner[`2026_${t.rosterId}`] = t.ownerId; });
 
-        // Owner-keyed rosterMap for analytics (prefer 2025 display info)
+        // Owner-keyed rosterMap for analytics (prefer most recent display info)
         const ownerRosterMap = {};
-        Object.values(data2024.rosterMap).forEach((t) => {
-          ownerRosterMap[t.ownerId] = { rosterId: t.ownerId, displayName: t.displayName, avatar: t.avatar, ownerId: t.ownerId };
-        });
-        Object.values(data2025.rosterMap).forEach((t) => {
-          ownerRosterMap[t.ownerId] = { rosterId: t.ownerId, displayName: t.displayName, avatar: t.avatar, ownerId: t.ownerId };
+        [data2024, data2025, data2026].forEach((sd) => {
+          Object.values(sd.rosterMap).forEach((t) => {
+            ownerRosterMap[t.ownerId] = { rosterId: t.ownerId, displayName: t.displayName, avatar: t.avatar, ownerId: t.ownerId };
+          });
         });
 
         // Tag games then re-map to owner IDs so the same two owners across seasons are one rivalry
@@ -119,6 +120,7 @@ export function useLeagueData(selectedSeason) {
         const allGames = [
           ...tag(data2024.games, '2024'),
           ...tag(data2025.games, '2025'),
+          ...tag(data2026.games, '2026'),
         ];
 
         const ownerGames = allGames.map((g) => ({
@@ -159,21 +161,22 @@ export function useLeagueData(selectedSeason) {
           });
         };
         addToTotals(data2024, false);
-        addToTotals(data2025, true);
+        addToTotals(data2025, false);
+        addToTotals(data2026, true);
         const allTimeStandings = Object.values(ownerTotals).sort((a, b) =>
           b.wins !== a.wins ? b.wins - a.wins : b.pointsFor - a.pointsFor
         );
 
         setData({
           mode: 'all',
-          seasons: { '2024': data2024, '2025': data2025 },
+          seasons: { '2024': data2024, '2025': data2025, '2026': data2026 },
           rosterMap: ownerRosterMap,
           allGames: ownerGames,
           allTimeStandings,
           h2h,
           scheduleLuck,
           superlatives,
-          currentSeasonData: data2025,
+          currentSeasonData: data2026,
         });
       } else {
         const leagueId = SEASONS[selectedSeason];

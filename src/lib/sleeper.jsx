@@ -3,9 +3,10 @@ export const USER_ID = '591358817996939264';
 export const SEASONS = {
   '2024': '1130652624027676672',
   '2025': '1185277150819115008',
+  '2026': '1326614681292394496',
 };
 
-export const DEFAULT_SEASON = '2025';
+export const DEFAULT_SEASON = '2026';
 
 const BASE = 'https://api.sleeper.app/v1';
 
