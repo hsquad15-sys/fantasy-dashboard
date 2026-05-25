@@ -57,7 +57,8 @@ function GradeBadge({ grade, color, size = 'sm' }) {
   );
 }
 
-function TradeStatCard({ emoji, label, name, avatar, net, trades }) {
+function TradeStatCard({ emoji, label, name, avatar, net, trades, tradeList = [] }) {
+  const [expanded, setExpanded] = useState(false);
   const isPositive = net >= 0;
   return (
     <div style={{
@@ -66,7 +67,7 @@ function TradeStatCard({ emoji, label, name, avatar, net, trades }) {
       borderRadius: 'var(--radius)',
       padding: '16px 20px',
       flex: 1,
-      minWidth: 200,
+      minWidth: 240,
     }}>
       <div style={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text3)', marginBottom: 10 }}>
         {emoji} {label}
@@ -75,7 +76,7 @@ function TradeStatCard({ emoji, label, name, avatar, net, trades }) {
         <Avatar avatar={avatar} name={name} size={32} />
         <span style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--text)' }}>{name}</span>
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: tradeList.length ? 10 : 0 }}>
         <span style={{
           fontFamily: 'var(--mono)',
           fontWeight: 800,
@@ -86,6 +87,47 @@ function TradeStatCard({ emoji, label, name, avatar, net, trades }) {
         </span>
         <span style={{ fontSize: '0.75rem', color: 'var(--text3)' }}>value · {trades} trade{trades !== 1 ? 's' : ''}</span>
       </div>
+      {tradeList.length > 0 && (
+        <>
+          <button
+            onClick={() => setExpanded((v) => !v)}
+            style={{
+              background: 'var(--bg3)', border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-pill)', color: 'var(--text2)',
+              fontSize: '0.72rem', fontWeight: 600, padding: '4px 10px',
+              cursor: 'pointer', marginBottom: expanded ? 10 : 0,
+            }}
+          >
+            {expanded ? 'Hide ▴' : `Show trades ▾`}
+          </button>
+          {expanded && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {tradeList.map((t, i) => (
+                <div key={i} style={{
+                  background: 'var(--bg3)', borderRadius: 6, padding: '8px 10px',
+                  display: 'flex', flexDirection: 'column', gap: 4,
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text3)' }}>{t.date}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {t.grade && <GradeBadge grade={t.grade.grade} color={t.grade.color} />}
+                      <span style={{
+                        fontFamily: 'var(--mono)', fontWeight: 700, fontSize: '0.8rem',
+                        color: t.net >= 0 ? '#4ade80' : '#f87171',
+                      }}>
+                        {t.net >= 0 ? '+' : ''}{Math.round(t.net).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text2)' }}>
+                    vs {t.opponents.join(', ')}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }
@@ -145,6 +187,7 @@ export default function Transactions({ transactions, rosterMap }) {
     if (!fcValues || !players) return null;
     const nets = {};
     const counts = {};
+    const teamTrades = {};
     sorted
       .filter((tx) => {
         if (tx.type !== 'trade') return false;
@@ -154,11 +197,22 @@ export default function Transactions({ transactions, rosterMap }) {
       .forEach((tx) => {
         const vals = computeTradeValues(tx);
         if (!vals) return;
+        const { date } = formatDateTime(tx.created);
         (tx.roster_ids || []).forEach((rid) => {
           const key = String(rid);
           const { received, sent } = vals[key] || { received: 0, sent: 0 };
-          nets[key] = (nets[key] || 0) + (received - sent);
+          const tradeNet = received - sent;
+          nets[key] = (nets[key] || 0) + tradeNet;
           counts[key] = (counts[key] || 0) + 1;
+          if (!teamTrades[key]) teamTrades[key] = [];
+          teamTrades[key].push({
+            date,
+            opponents: (tx.roster_ids || [])
+              .filter((r) => String(r) !== key)
+              .map((r) => rosterMap[r]?.displayName || rosterMap[Number(r)]?.displayName || `Team ${r}`),
+            net: tradeNet,
+            grade: vals[key]?.grade,
+          });
         });
       });
     const entries = Object.entries(nets)
@@ -167,6 +221,7 @@ export default function Transactions({ transactions, rosterMap }) {
         trades: counts[rid] || 0,
         name:   rosterMap[Number(rid)]?.displayName || rosterMap[rid]?.displayName || `Team ${rid}`,
         avatar: rosterMap[Number(rid)]?.avatar      || rosterMap[rid]?.avatar,
+        tradeList: teamTrades[rid] || [],
       }))
       .filter((e) => e.trades > 0);
     if (entries.length < 2) return null;
@@ -395,6 +450,7 @@ export default function Transactions({ transactions, rosterMap }) {
             avatar={tradeStats.shark.avatar}
             net={tradeStats.shark.net}
             trades={tradeStats.shark.trades}
+            tradeList={tradeStats.shark.tradeList}
           />
           <TradeStatCard
             emoji="🍳"
@@ -403,6 +459,7 @@ export default function Transactions({ transactions, rosterMap }) {
             avatar={tradeStats.cooked.avatar}
             net={tradeStats.cooked.net}
             trades={tradeStats.cooked.trades}
+            tradeList={tradeStats.cooked.tradeList}
           />
           </div>
         </div>
