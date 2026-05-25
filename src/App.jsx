@@ -71,16 +71,36 @@ export default function App() {
               2024–2025
             </p>
           </div>
-          <div className="season-switcher">
-            {['2024', '2025', 'all'].map((s) => (
-              <button
-                key={s}
-                className={`season-btn${season === s ? ' active' : ''}`}
-                onClick={() => setSeason(s)}
-              >
-                {s === 'all' ? 'All Time' : s}
-              </button>
-            ))}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div className="season-switcher">
+              {['2024', '2025', 'all'].map((s) => (
+                <button
+                  key={s}
+                  className={`season-btn${season === s ? ' active' : ''}`}
+                  onClick={() => setSeason(s)}
+                >
+                  {s === 'all' ? 'All Time' : s}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={reload}
+              disabled={loading}
+              title="Refresh data"
+              style={{
+                background: 'var(--bg3)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-sm)',
+                color: loading ? 'var(--text3)' : 'var(--text2)',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                padding: '6px 10px',
+                fontSize: '1rem',
+                lineHeight: 1,
+                transition: 'all 0.15s',
+              }}
+            >
+              {loading ? '⏳' : '🔄'}
+            </button>
           </div>
         </div>
         <nav className="tab-nav">

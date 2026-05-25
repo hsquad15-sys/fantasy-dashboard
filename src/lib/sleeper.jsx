@@ -13,7 +13,7 @@ export const avatarUrl = (avatarId) =>
   avatarId ? `https://sleepercdn.com/avatars/thumbs/${avatarId}` : null;
 
 async function get(url) {
-  const res = await fetch(url);
+  const res = await fetch(url, { cache: 'no-store' });
   if (!res.ok) throw new Error(`Sleeper API error ${res.status}: ${url}`);
   return res.json();
 }
