@@ -62,9 +62,15 @@ async function loadSeason(leagueId, season) {
 
   let championRosterId = null;
   if (Array.isArray(winnersBracket) && winnersBracket.length) {
-    const maxRound = Math.max(...winnersBracket.map((m) => m.r));
-    const champMatch = winnersBracket.find((m) => m.r === maxRound && m.m === 1);
-    if (champMatch?.w) championRosterId = champMatch.w;
+    // Sleeper marks the championship game with p=1; fall back to highest round m=1
+    const byPlacement = winnersBracket.find((m) => m.p === 1 && m.w);
+    if (byPlacement) {
+      championRosterId = byPlacement.w;
+    } else {
+      const maxRound = Math.max(...winnersBracket.map((m) => m.r));
+      const champMatch = winnersBracket.find((m) => m.r === maxRound && m.m === 1 && m.w);
+      if (champMatch) championRosterId = champMatch.w;
+    }
   }
 
   return {
