@@ -8,7 +8,7 @@ function Avatar({ avatar, name }) {
   return <div className="avatar-placeholder">{(name || '?')[0].toUpperCase()}</div>;
 }
 
-export default function Standings({ standings, rosterMap, season, league, seasonsData, games, scheduleLuck }) {
+export default function Standings({ standings, rosterMap, season, league, seasonsData, games, scheduleLuck, championRosterId }) {
   const [selectedTeam, setSelectedTeam] = useState(null);
 
   if (!standings || standings.length === 0) {
@@ -16,6 +16,10 @@ export default function Standings({ standings, rosterMap, season, league, season
   }
 
   const playoffSpots = league?.settings?.playoff_teams || 6;
+
+  const topPFRosterId = standings.length > 0
+    ? standings.reduce((a, b) => b.pointsFor > a.pointsFor ? b : a).rosterId
+    : null;
 
   const openTeam = (team) => {
     const seasons = [];
@@ -62,6 +66,8 @@ export default function Standings({ standings, rosterMap, season, league, season
               const isPlayoffLine = idx === playoffSpots && season !== 'all';
               const diff = (team.pointsFor - team.pointsAgainst).toFixed(1);
               const diffNum = parseFloat(diff);
+              const isChampion = season !== 'all' && championRosterId && String(team.rosterId) === String(championRosterId);
+              const isTopPF = season !== 'all' && topPFRosterId && String(team.rosterId) === String(topPFRosterId);
               return (
                 <tr
                   key={team.rosterId}
@@ -74,16 +80,23 @@ export default function Standings({ standings, rosterMap, season, league, season
                     <div className="team-cell">
                       <Avatar avatar={team.avatar} name={team.displayName} />
                       <div>
-                        <div className="team-name">{team.displayName}</div>
-                        {idx === 0 && season !== 'all' && (
-                          <span className="badge badge-gold" style={{ fontSize: '0.68rem', marginTop: 2 }}>🏆 1st</span>
-                        )}
+                        <div className="team-name" style={isChampion ? { color: 'var(--gold)' } : {}}>
+                          {team.displayName}{isChampion ? ' 💍' : ''}
+                        </div>
+                        <div style={{ display: 'flex', gap: 4, marginTop: 2, flexWrap: 'wrap' }}>
+                          {idx === 0 && season !== 'all' && (
+                            <span className="badge badge-gold" style={{ fontSize: '0.68rem' }}>🏆 1st</span>
+                          )}
+                          {isTopPF && (
+                            <span className="badge" style={{ fontSize: '0.68rem', background: 'rgba(139,92,246,0.15)', color: 'var(--purple)' }}>Most PF</span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </td>
                   <td className="center"><span className="record" style={{ color: 'var(--green)' }}>{team.wins}</span></td>
                   <td className="center"><span className="record" style={{ color: 'var(--red)' }}>{team.losses}</span></td>
-                  <td className="right pts">{team.pointsFor.toFixed(1)}</td>
+                  <td className="right pts" style={isTopPF ? { color: 'var(--purple)' } : {}}>{team.pointsFor.toFixed(1)}</td>
                   <td className="right pts" style={{ color: 'var(--text3)' }}>{team.pointsAgainst.toFixed(1)}</td>
                   <td className="right">
                     <span className="pts" style={{ color: diffNum >= 0 ? 'var(--green)' : 'var(--red)' }}>

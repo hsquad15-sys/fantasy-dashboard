@@ -60,6 +60,13 @@ async function loadSeason(leagueId, season) {
     return b.pointsFor - a.pointsFor;
   });
 
+  let championRosterId = null;
+  if (Array.isArray(winnersBracket) && winnersBracket.length) {
+    const maxRound = Math.max(...winnersBracket.map((m) => m.r));
+    const champMatch = winnersBracket.find((m) => m.r === maxRound && m.m === 1);
+    if (champMatch?.w) championRosterId = champMatch.w;
+  }
+
   return {
     league,
     rosters,
@@ -75,6 +82,7 @@ async function loadSeason(leagueId, season) {
     nflState,
     currentWeek,
     season,
+    championRosterId,
   };
 }
 

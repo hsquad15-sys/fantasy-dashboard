@@ -139,6 +139,7 @@ export default function App() {
                 league={data.currentSeasonData?.league}
                 games={data.allGames || []}
                 scheduleLuck={data.scheduleLuck || []}
+                championRosterId={data.mode === 'single' ? data.championRosterId : null}
                 seasonsData={
                   data.mode === 'all'
                     ? { '2024': data.seasons?.['2024'], '2025': data.seasons?.['2025'], '2026': data.seasons?.['2026'] }
