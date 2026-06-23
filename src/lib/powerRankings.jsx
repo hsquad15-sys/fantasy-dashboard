@@ -2,9 +2,7 @@ function mean(arr) {
   return arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
 }
 
-// Sample stdev with a league-typical fallback when a team has too few games to measure variance
 function stdev(arr) {
-  if (arr.length < 2) return 18;
   const m = mean(arr);
   return Math.sqrt(mean(arr.map((v) => (v - m) ** 2)));
 }
@@ -118,16 +116,25 @@ export function computeStrengthOfSchedule(games, uptoWeek) {
 export function simulatePlayoffOdds(games, rosterMap, uptoWeek, playoffSpots, regularSeasonEndWeek, simulations = 3000) {
   const rosterIds = Object.keys(rosterMap);
   const logsUpTo = buildTeamGameLogs(games, uptoWeek);
-  const leagueAvgPF = mean(Object.values(logsUpTo).flat().map((g) => g.points)) || 110;
+  const allScores = Object.values(logsUpTo).flat().map((g) => g.points);
+  const leagueAvgPF = mean(allScores) || 110;
+  const leagueSd = allScores.length >= 2 ? stdev(allScores) : 18;
 
+  // Shrink each team's projected mean/stdev toward the league average, weighted by games played.
+  // Without this, a single fluke week-1 score makes that team look like a lock for the rest of
+  // the season — overconfident odds that don't reflect how little data actually exists yet.
+  const PRIOR_GAMES = 5;
   const currentWins = {}, currentPF = {}, teamMean = {}, teamSd = {};
   rosterIds.forEach((id) => {
     const log = logsUpTo[id] || [];
     currentWins[id] = log.filter((g) => g.won).length;
     currentPF[id] = log.reduce((s, g) => s + g.points, 0);
     const pts = log.map((g) => g.points);
-    teamMean[id] = pts.length ? mean(pts) : leagueAvgPF;
-    teamSd[id] = stdev(pts);
+    const shrink = pts.length / (pts.length + PRIOR_GAMES);
+    const ownMean = pts.length ? mean(pts) : leagueAvgPF;
+    const ownSd = pts.length >= 2 ? stdev(pts) : leagueSd;
+    teamMean[id] = shrink * ownMean + (1 - shrink) * leagueAvgPF;
+    teamSd[id] = shrink * ownSd + (1 - shrink) * leagueSd;
   });
 
   const remainingGames = games.filter((g) => g.week > uptoWeek);
@@ -168,8 +175,14 @@ export function simulatePlayoffOdds(games, rosterMap, uptoWeek, playoffSpots, re
       .forEach((id) => playoffCounts[id]++);
   }
 
+  // While games remain on the schedule, nothing is mathematically a lock or an elimination yet —
+  // clamp away from literal 100%/0% so the odds never overstate certainty mid-season.
   const odds = {};
-  rosterIds.forEach((id) => { odds[id] = Math.round((playoffCounts[id] / simulations) * 100); });
+  rosterIds.forEach((id) => {
+    let pct = Math.round((playoffCounts[id] / simulations) * 100);
+    if (weeksRemaining > 0) pct = Math.min(99, Math.max(1, pct));
+    odds[id] = pct;
+  });
   return odds;
 }
 
