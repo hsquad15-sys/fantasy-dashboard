@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { DEFAULT_SEASON } from './lib/sleeper.jsx';
 import { useLeagueData } from './hooks/useLeagueData.jsx';
 import Standings from './components/Standings.jsx';
+import PowerRankings from './components/PowerRankings.jsx';
 import Matchups from './components/Matchups.jsx';
 import PointsChart from './components/PointsChart.jsx';
 import Transactions from './components/Transactions.jsx';
@@ -12,6 +13,7 @@ import Games from './components/Games.jsx';
 
 const TABS = [
   { id: 'standings', label: 'Standings' },
+  { id: 'power', label: 'Power Rankings' },
   { id: 'rivalries', label: 'Rivalries' },
   { id: 'games', label: 'Games' },
   { id: 'superlatives', label: 'Superlatives' },
@@ -145,6 +147,13 @@ export default function App() {
                     ? { '2024': data.seasons?.['2024'], '2025': data.seasons?.['2025'], '2026': data.seasons?.['2026'] }
                     : { [season]: data.currentSeasonData }
                 }
+              />
+            )}
+            {activeTab === 'power' && (
+              <PowerRankings
+                games={data.currentSeasonData?.games || []}
+                rosterMap={data.currentSeasonData?.rosterMap || {}}
+                league={data.currentSeasonData?.league}
               />
             )}
             {activeTab === 'rivalries' && (
