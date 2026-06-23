@@ -141,6 +141,31 @@ export function simulatePlayoffOdds(games, rosterMap, uptoWeek, playoffSpots, re
   const weeksRemaining = Math.max(0, regularSeasonEndWeek - uptoWeek);
   const useFallbackSchedule = remainingGames.length === 0 && weeksRemaining > 0;
 
+  const remainingGamesCount = {};
+  rosterIds.forEach((id) => (remainingGamesCount[id] = 0));
+  if (useFallbackSchedule) {
+    rosterIds.forEach((id) => (remainingGamesCount[id] = weeksRemaining));
+  } else {
+    remainingGames.forEach((g) => {
+      remainingGamesCount[g.team1Id] = (remainingGamesCount[g.team1Id] || 0) + 1;
+      remainingGamesCount[g.team2Id] = (remainingGamesCount[g.team2Id] || 0) + 1;
+    });
+  }
+
+  // Clinched only if guaranteed in even in the worst tiebreak case (a rival tying T's floor could
+  // still beat them on PF, so count ties against T). Eliminated only if no tiebreak could save them
+  // (a rival must strictly beat T's ceiling on wins alone to count, since ties could go T's way).
+  const clinchStatus = {};
+  rosterIds.forEach((id) => {
+    const floor = currentWins[id];
+    const ceiling = currentWins[id] + remainingGamesCount[id];
+    const rivalsCanCatchOrTie = rosterIds.filter((other) => other !== id && currentWins[other] + remainingGamesCount[other] >= floor).length;
+    const rivalsAheadForSure = rosterIds.filter((other) => other !== id && currentWins[other] > ceiling).length;
+    if (rivalsCanCatchOrTie < playoffSpots) clinchStatus[id] = 'clinched';
+    else if (rivalsAheadForSure >= playoffSpots) clinchStatus[id] = 'eliminated';
+    else clinchStatus[id] = null;
+  });
+
   const playoffCounts = {};
   rosterIds.forEach((id) => (playoffCounts[id] = 0));
 
@@ -175,13 +200,16 @@ export function simulatePlayoffOdds(games, rosterMap, uptoWeek, playoffSpots, re
       .forEach((id) => playoffCounts[id]++);
   }
 
-  // While games remain on the schedule, nothing is mathematically a lock or an elimination yet —
-  // clamp away from literal 100%/0% so the odds never overstate certainty mid-season.
+  // Once no games remain, the simulation is deterministic and already PF-tiebreak-accurate —
+  // trust it directly. Otherwise, only a real mathematical clinch/elimination gets to claim
+  // 100%/0%; everything else clamps away from those literal bounds.
   const odds = {};
   rosterIds.forEach((id) => {
-    let pct = Math.round((playoffCounts[id] / simulations) * 100);
-    if (weeksRemaining > 0) pct = Math.min(99, Math.max(1, pct));
-    odds[id] = pct;
+    const pct = Math.round((playoffCounts[id] / simulations) * 100);
+    if (weeksRemaining === 0) { odds[id] = pct; return; }
+    if (clinchStatus[id] === 'clinched') { odds[id] = 100; return; }
+    if (clinchStatus[id] === 'eliminated') { odds[id] = 0; return; }
+    odds[id] = Math.min(99, Math.max(1, pct));
   });
   return odds;
 }
