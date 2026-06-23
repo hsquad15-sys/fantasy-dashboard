@@ -48,7 +48,14 @@ function oddsColor(pct) {
   return 'var(--red)';
 }
 
+function scoreColor(value) {
+  if (value >= 67) return 'var(--green)';
+  if (value >= 34) return 'var(--gold)';
+  return 'var(--red)';
+}
+
 export default function PowerRankings({ games, rosterMap, league }) {
+  const [showScoreInfo, setShowScoreInfo] = useState(false);
   const playoffSpots = league?.settings?.playoff_teams || 6;
   const regularSeasonEndWeek = (league?.settings?.playoff_week_start || 15) - 1;
 
@@ -97,6 +104,37 @@ export default function PowerRankings({ games, rosterMap, league }) {
         </select>
       </div>
 
+      {showScoreInfo && (
+        <div style={{
+          background: 'var(--bg2)',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--radius)',
+          padding: '20px 24px',
+          marginBottom: 20,
+        }}>
+          <p style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>
+            How is Score calculated?
+          </p>
+          <p style={{ fontSize: '0.875rem', color: 'var(--text2)', lineHeight: 1.7 }}>
+            Score is a 0–100 number blending three things, each ranked against the rest of the league:
+          </p>
+          <p style={{ fontSize: '0.875rem', color: 'var(--text2)', lineHeight: 1.7, marginTop: 8 }}>
+            <strong style={{ color: 'var(--blue)' }}>Recent Form (40%)</strong> — your average points over the last 4 games. How hot are you right now?
+          </p>
+          <p style={{ fontSize: '0.875rem', color: 'var(--text2)', lineHeight: 1.7, marginTop: 4 }}>
+            <strong style={{ color: 'var(--blue)' }}>Season PF/Game (30%)</strong> — your scoring average across the whole season.
+          </p>
+          <p style={{ fontSize: '0.875rem', color: 'var(--text2)', lineHeight: 1.7, marginTop: 4 }}>
+            <strong style={{ color: 'var(--blue)' }}>Quality of Wins (30%)</strong> — wins count for more when the team you beat had a good record.
+          </p>
+          <p style={{ fontSize: '0.875rem', color: 'var(--text2)', lineHeight: 1.7, marginTop: 8 }}>
+            <span style={{ color: 'var(--green)', fontWeight: 700 }}>Green</span> = top tier ·{' '}
+            <span style={{ color: 'var(--gold)', fontWeight: 700 }}>Yellow</span> = middle of the pack ·{' '}
+            <span style={{ color: 'var(--red)', fontWeight: 700 }}>Red</span> = bottom tier
+          </p>
+        </div>
+      )}
+
       <div className="card standings-wrap">
         <table className="data-table">
           <thead>
@@ -104,8 +142,25 @@ export default function PowerRankings({ games, rosterMap, league }) {
               <th style={{ width: 32 }}>#</th>
               <th>Team</th>
               <th className="center">Trend</th>
-              <th className="center">Score</th>
-              <th className="right">SOS</th>
+              <th className="center">
+                Score
+                <button
+                  onClick={() => setShowScoreInfo((s) => !s)}
+                  style={{
+                    display: 'block', margin: '2px auto 0', background: 'none', border: 'none',
+                    color: 'var(--blue)', fontSize: '0.62rem', fontWeight: 600, textTransform: 'none',
+                    letterSpacing: 0, cursor: 'pointer', padding: 0,
+                  }}
+                >
+                  {showScoreInfo ? 'Hide formula ▲' : 'How? ▼'}
+                </button>
+              </th>
+              <th className="right">
+                SOS
+                <div style={{ fontSize: '0.62rem', fontWeight: 400, color: 'var(--text3)', textTransform: 'none', letterSpacing: 0 }}>
+                  Opponent strength
+                </div>
+              </th>
               <th className="right">Playoff Odds</th>
             </tr>
           </thead>
@@ -130,7 +185,7 @@ export default function PowerRankings({ games, rosterMap, league }) {
                   <div style={{ fontSize: '0.65rem', color: 'var(--text3)' }}>Last wk: #{r.prevRank}</div>
                 </td>
                 <td className="center">
-                  <GaugeStat value={r.score} label={r.score} color="var(--blue)" />
+                  <GaugeStat value={r.score} label={r.score} color={scoreColor(r.score)} />
                 </td>
                 <td className="right">
                   <span className="pts">
