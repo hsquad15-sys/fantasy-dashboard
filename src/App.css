@@ -531,3 +531,8 @@ img { display: block; }
   .superlatives-grid { grid-template-columns: 1fr; }
   .header-title .league-sub { display: none; }
 }
+
+@keyframes panel-slide-in {
+  from { transform: translateY(14px); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
